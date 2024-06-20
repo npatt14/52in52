@@ -1,91 +1,56 @@
-import express, { json } from 'express';
-import cors from 'cors';
-import bcrypt from 'bcryptjs';
-import pkg from 'pg';
+import express from "express";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url"; // necessary to be able to use dirname__, not supported on the one were using 
+import userController from "./userController.js";
 
+// Create __dirname equivalent in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const SALT_WORK_FACTOR = 10;
-const { Pool } = pkg;
+const app = express(); // Initialize an Express application
+const PORT = 5001; // Define the port the server will listen on
 
-// password : rohdin-cazhaQ-7hofre
-//Create new pool
-const PG_URI = 'postgres://postgres.wflkbmtxutcixiovklfp:rohdin-cazhaQ-7hofre@aws-0-sa-east-1.pooler.supabase.com:6543/postgres'
+app.use(cors()); // Enable CORS middleware
+app.use(express.json()); // Parse incoming JSON payloads
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded payloads
+app.use(express.static(path.resolve(__dirname, "../frontend"))); // Serve static data from frontend
 
-const pool = new Pool({
-    connectionString: PG_URI
+app.get("/",  (req, res) => {
+  res.sendFile(path.resolve(__dirname, "../frontend/index.html"));
 });
 
-const app = express();
-const PORT = 5001;
 
-app.use(cors());
-app.use(express.json());
-
-
-app.post('/signup', async (req, res) => { // user posts username passw and email when they sign up
-    // destructure username, passw, and email from req body
-    const { username, password, email } = req.body;
-
-    if (!username || !password || !email) {
-        return res.status(400).send('All fields are required');
-     }
-    
-    try {
-    const hashedPassword = await bcrypt.hash(password, SALT_WORK_FACTOR);
-    const result = await pool.query(
-        'INSERT INTO users (username, password, email) VALUES ($1, $2, $3) RETURNING *', 
-        [username, hashedPassword, email]
-    );
-    
-    res.status(200).json({ userId: result.rows[0].id}); // return the first index from the object that is result
-    } catch (err) {
-        res.status(400).json({ error: err.message});
-    }
+app.get("/signup", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "../frontend/signup.html"));
 });
 
-app.post('/login', async (req, res) => { // user TESTS username passw and email AGAINST users in existing db to see if they ARE a user, if theyre not we route them to signup 
-    // destructure username and password
-    const { username, password } = req.body;
 
-    try {   
-    const result = await pool.query(
-        'SELECT * FROM users WHERE username = $1',
-        [username]
-    );
-    if (result.rows.length === 0) {
-        return res.status(400).json({error: "User not found" });
-    }
+// Route for user signup; applies signUp middleware and then success middleware
+app.post("/signup", userController.signUp, (req, res) => {
+  res.redirect("/success");
+}); 
 
-    const user = result.rows[0];
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-        return res.status(400).json({error: "Invalid Credientials" });
-    }
-    res.status(200).json({ message: 'Login successful' });
-    } catch {
-        res.status(500).json({ error: err.message });
-    }
+// Route for user login; applies logIn middleware and then success middleware
+app.post("/login", userController.logIn, (req, res) => {
+  res.redirect("/success");
 });
 
-app.get('/success', async (req, res) => { // if all is well, and the password inputted and username are in the db, redirect user to secret page for a surprise 
-
+app.get("/success", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "../frontend/success.html"));
 });
 
-// stretch feature, add a 'forget your password option' 
+// Catch-all handler for undefined routes; returns 404 status
+app.use((req, res) =>
+  res.status(404).send("This is not the page you're looking for...")
+);
 
-
-// catch all route handler for any request 
-app.use((req, res) => res.status(404).send('This is not the page you\'re looking for...'));
-
-
-
-// default error handler for middleware 
+// Error handling middleware; logs error and sends response
 app.use((err, req, res, next) => {
   const defaultErr = {
-    log: 'Express error handler caught unknown middleware error',
+    log: "Express error handler caught unknown middleware error",
     status: 500,
-    message: { err: 'An error occurred' },
+    message: { err: "An error occurred" },
   };
   const errorObj = Object.assign({}, defaultErr, err);
   console.log(errorObj.log);
@@ -93,7 +58,6 @@ app.use((err, req, res, next) => {
 });
 
 
-// start server
 app.listen(PORT, () => {
-    console.log(`listening on ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
