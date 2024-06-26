@@ -11,6 +11,15 @@ const __dirname = path.dirname(__filename);
 const app = express(); // Initialize an Express application
 const PORT = 5001; // Define the port the server will listen on
 
+// configure express.static to handle .jsx files properly
+app.use(express.static(path.resolve(__dirname, "../frontend"), {
+  setHeaders: (res, path, stat) => {
+    if (path.endsWith(".jsx")) {
+      res.setHeader("Content-Type", "application/javascript");
+    }
+  },
+}));
+
 app.use(cors()); // Enable CORS middleware
 app.use(express.json()); // Parse incoming JSON payloads
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded payloads

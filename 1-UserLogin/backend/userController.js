@@ -8,25 +8,25 @@ const userController = {};
 
 // Middleware for signing up a new user
 userController.signUp = async (req, res, next) => {
-  const { username, password, email } = req.body;
+  const { username, password } = req.body;
 
-  if (!username || !password || !email) {
+  if (!username || !password) {
     return res.status(400).send("All fields are required");
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, SALT_WORK_FACTOR);
     const result = await query(
-      "INSERT INTO users (username, password, email) VALUES ($1, $2, $3) RETURNING *",
-      [username, hashedPassword, email]
+      "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+      [username, hashedPassword]
     );
     res.locals.userId = result.rows[0].id;
     // Set user data in locals for response
     res.locals.user = {
       id: result.rows[0].id,
       username: result.rows[0].username,
-      email: result.rows[0].email,
     };
+    console.log('USER SIGNED UP');
     return next();
   } catch (err) {
     return next({
